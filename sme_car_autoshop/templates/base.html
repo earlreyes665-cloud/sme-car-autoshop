@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SME Car Autoshop{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+{% if current_user.get('user_id') %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-icon"><i class="fa-solid fa-wrench"></i></span><span>SME Car <small>Autoshop System</small></span></a>
+    <nav class="nav-menu">
+      <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+      <a class="nav-link {% if request.endpoint in ['job_orders','job_order_delete'] %}active{% endif %}" href="{{ url_for('job_orders') }}"><i class="fa-solid fa-clipboard-list"></i> Job Orders</a>
+      <a class="nav-link {% if request.endpoint in ['customers','customer_delete'] %}active{% endif %}" href="{{ url_for('customers') }}"><i class="fa-solid fa-users"></i> Customers</a>
+      <a class="nav-link {% if request.endpoint in ['vehicles','vehicle_delete'] %}active{% endif %}" href="{{ url_for('vehicles') }}"><i class="fa-solid fa-car"></i> Vehicles</a>
+      <a class="nav-link {% if request.endpoint in ['autoparts','autoparts_delete'] %}active{% endif %}" href="{{ url_for('autoparts') }}"><i class="fa-solid fa-boxes-stacked"></i> Auto Parts</a>
+      <a class="nav-link {% if request.endpoint in ['services','service_delete','service_toggle'] %}active{% endif %}" href="{{ url_for('services') }}"><i class="fa-solid fa-screwdriver-wrench"></i> Services</a>
+      <a class="nav-link {% if request.endpoint in ['invoices','invoice_delete','invoice_print'] %}active{% endif %}" href="{{ url_for('invoices') }}"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      {% if current_user.get('role') == 'Admin' %}<a class="nav-link {% if request.endpoint in ['system_users','system_user_delete'] %}active{% endif %}" href="{{ url_for('system_users') }}"><i class="fa-solid fa-user-gear"></i> System Users</a>{% endif %}
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span> MySQL connected through Flask<br><small>Local workspace</small></div>
+  </aside>
+  <main class="main-content">
+    <header class="top-header">
+      <div><span class="eyebrow">SME CAR AUTOSHOP</span><h2>{% block header %}Management Dashboard{% endblock %}</h2></div>
+      <div class="user-profile"><div class="avatar">{{ current_user.get('full_name','U')[:1]|upper }}</div><div class="user-info"><strong>{{ current_user.get('full_name','User') }}</strong><small>{{ current_user.get('role','Staff') }}</small></div><form action="{{ url_for('logout') }}" method="post"><button class="btn btn-light btn-small" type="submit"><i class="fa-solid fa-right-from-bracket"></i> Logout</button></form></div>
+    </header>
+    <section class="content-body">
+      {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-stack">{% for category,message in messages %}<div class="flash {{ category }}">{{ message }}<button type="button" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button></div>{% endfor %}</div>{% endif %}{% endwith %}
+      {% block content %}{% endblock %}
+    </section>
+    <footer class="footer">SME Car Autoshop Management System · Flask + MySQL</footer>
+  </main>
+</div>
+{% else %}
+{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="login-flashes">{% for category,message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+{% block public_content %}{% endblock %}
+{% endif %}
+<script>
+document.querySelectorAll('form[data-confirm]').forEach(form => form.addEventListener('submit', event => {
+  if (!confirm(form.dataset.confirm || 'Are you sure?')) event.preventDefault();
+}));
+document.querySelectorAll('[data-search-input]').forEach(input => {
+  input.addEventListener('input', () => {
+    const target = document.querySelector(input.dataset.searchInput);
+    if (!target) return;
+    const q = input.value.toLowerCase();
+    target.querySelectorAll('tbody tr').forEach(row => row.hidden = !row.innerText.toLowerCase().includes(q));
+  });
+});
+</script>
+{% block scripts %}{% endblock %}
+</body></html>

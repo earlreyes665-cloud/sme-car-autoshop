@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Customers · SME Car Autoshop{% endblock %}{% block header %}Customer Management{% endblock %}
+{% block content %}<div class="page-heading"><div><h1>Customers</h1><p>Register and manage customer contact details.</p></div></div>
+<div class="two-column">
+<section class="panel form-panel"><div class="panel-heading"><div><h3>{{ 'Edit Customer' if editing else 'Register Customer' }}</h3><p>Required fields are marked automatically.</p></div></div>
+<form class="stack-form" method="post">
+{% if editing %}<input type="hidden" name="id" value="{{ editing.id }}">{% endif %}
+<div class="form-row"><label>First Name<input name="first_name" required maxlength="60" value="{{ editing.first_name if editing else '' }}"></label><label>Last Name<input name="last_name" required maxlength="60" value="{{ editing.last_name if editing else '' }}"></label></div>
+<label>Phone Number<input name="phone" required maxlength="25" value="{{ editing.phone if editing else '' }}" placeholder="09xx xxx xxxx"></label>
+<label>Email Address <span class="muted">(optional)</span><input type="email" name="email" value="{{ editing.email if editing and editing.email else '' }}"></label>
+<label>Customer Type<select name="customer_type">{% for v in ['Regular','VIP','Corporate'] %}<option value="{{ v }}" {% if editing and editing.customer_type==v %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+<label>Address<textarea name="address" rows="2">{{ editing.address if editing and editing.address else '' }}</textarea></label>
+<div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> {{ 'Update Customer' if editing else 'Save Customer' }}</button>{% if editing %}<a class="btn btn-light" href="{{ url_for('customers') }}">Cancel</a>{% endif %}</div>
+</form></section>
+<section class="panel"><div class="panel-heading"><div><h3>Customer Directory</h3><p>{{ items|length }} registered customer(s)</p></div></div><div class="table-tools"><input data-search-input="#customer-table" placeholder="Search customers..."></div>
+<div class="table-wrap"><table id="customer-table"><thead><tr><th>Customer</th><th>Contact</th><th>Type</th><th>Vehicles</th><th>Actions</th></tr></thead><tbody>
+{% for item in items %}<tr><td><strong>{{ item.full_name }}</strong><small>{{ item.address or 'No address provided' }}</small></td><td>{{ item.phone }}<small>{{ item.email or 'No email' }}</small></td><td><span class="badge {{ item.customer_type|lower }}">{{ item.customer_type }}</span></td><td>{{ item.vehicles|length }}</td><td class="actions"><a class="icon-link" href="{{ url_for('customers', edit=item.id) }}" title="Edit"><i class="fa-solid fa-pen"></i></a><form method="post" action="{{ url_for('customer_delete',item_id=item.id) }}" data-confirm="Delete this customer?"><button class="icon-link danger" title="Delete"><i class="fa-solid fa-trash"></i></button></form></td></tr>
+{% else %}<tr><td colspan="5" class="empty-state">No customers found.</td></tr>{% endfor %}
+</tbody></table></div></section></div>{% endblock %}

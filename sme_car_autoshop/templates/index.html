@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Dashboard · SME Car Autoshop{% endblock %}{% block header %}Dashboard Overview{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>Good day, {{ current_user.get('full_name','User').split(' ')[0] }}.</h1><p>Here is the current overview of your autoshop.</p></div><a class="btn btn-primary" href="{{ url_for('job_orders') }}"><i class="fa-solid fa-plus"></i> New Job Order</a></div>
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-icon blue"><i class="fa-solid fa-clipboard-list"></i></div><div><span>Active Job Orders</span><strong>{{ active_jobs }}</strong></div></div>
+  <div class="stat-card"><div class="stat-icon purple"><i class="fa-solid fa-users"></i></div><div><span>Customers</span><strong>{{ customers_count }}</strong></div></div>
+  <div class="stat-card"><div class="stat-icon green"><i class="fa-solid fa-car"></i></div><div><span>Registered Vehicles</span><strong>{{ vehicles_count }}</strong></div></div>
+  <div class="stat-card"><div class="stat-icon yellow"><i class="fa-solid fa-box-open"></i></div><div><span>Low / Out of Stock</span><strong>{{ low_stock }}</strong></div></div>
+</div>
+<div class="panel">
+ <div class="panel-heading"><div><h3>Recent Job Orders</h3><p>Latest work recorded in the database</p></div><a class="text-link" href="{{ url_for('job_orders') }}">View all <i class="fa-solid fa-arrow-right"></i></a></div>
+ <div class="table-wrap"><table><thead><tr><th>Job ID</th><th>Customer / Vehicle</th><th>Technician</th><th>Complaint</th><th>Status</th><th>Estimate</th><th></th></tr></thead><tbody>
+ {% for item in recent_jobs %}<tr><td><strong>#JO-{{ '%04d'|format(item.id) }}</strong><small>{{ item.created_at.strftime('%b %d, %Y') }}</small></td><td>{{ item.vehicle.owner.full_name }}<small>{{ item.vehicle.display_name }}</small></td><td>{{ item.technician.full_name if item.technician else 'Unassigned' }}</td><td>{{ item.complaint }}</td><td><span class="badge {{ item.status|lower|replace(' ','-') }}">{{ item.status }}</span></td><td>{{ item.total_cost|peso }}</td><td><a class="icon-link" href="{{ url_for('job_orders', edit=item.id) }}" title="Edit"><i class="fa-solid fa-pen"></i></a></td></tr>
+ {% else %}<tr><td colspan="7" class="empty-state">No job orders yet. Create a customer and vehicle, then start a job order.</td></tr>{% endfor %}
+ </tbody></table></div>
+</div>
+<div class="stats-note"><i class="fa-solid fa-circle-info"></i> Paid invoice revenue to date: <strong>{{ revenue|peso }}</strong>. Dashboard values are calculated from MySQL records.</div>
+{% endblock %}
