@@ -1,5 +1,7 @@
+import base64
 import os
 import re
+import tempfile
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -31,6 +33,16 @@ db_host = os.environ.get("TIDB_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
 db_port = int(os.environ.get("TIDB_PORT") or ("4000" if os.environ.get("TIDB_HOST") else "3306"))
 db_name = os.environ.get("TIDB_DATABASE") or os.environ.get("DB_NAME", "sme_car_autoshop")
 ca_path = os.environ.get("TIDB_CA_PATH") or os.environ.get("CA_PATH")
+ca_cert_b64 = os.environ.get("TIDB_CA_CERT_BASE64")
+if ca_cert_b64:
+    try:
+        cert_bytes = base64.b64decode(ca_cert_b64, validate=True)
+        cert_file = os.path.join(tempfile.gettempdir(), "tidb-cloud-ca.pem")
+        with open(cert_file, "wb") as cert_handle:
+            cert_handle.write(cert_bytes)
+        ca_path = cert_file
+    except Exception as exc:
+        raise RuntimeError("TIDB_CA_CERT_BASE64 must contain the Base64-encoded TiDB CA certificate.") from exc
 
 if not re.fullmatch(r"[A-Za-z0-9_]+", db_name):
     raise RuntimeError("TIDB_DATABASE/DB_NAME may contain only letters, numbers, and underscores.")
