@@ -1,25 +1,69 @@
 import os
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+import pymysql
+from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import URL
 from sqlalchemy.exc import IntegrityError
+
+load_dotenv()
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret-before-deployment")
-db_user = os.environ.get("DB_USER", "root")
-db_password = os.environ.get("DB_PASSWORD", "")
-db_host = os.environ.get("DB_HOST", "127.0.0.1")
-db_name = os.environ.get("DB_NAME", "sme_car_autoshop")
-password_part = f":{db_password}" if db_password else ""
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"mysql+pymysql://{db_user}{password_part}@{db_host}/{db_name}?charset=utf8mb4"
+is_render = bool(os.environ.get("RENDER"))
+secret_key = os.environ.get("SECRET_KEY")
+if is_render and not secret_key:
+    raise RuntimeError("Set a strong SECRET_KEY in the Render environment.")
+app.config["SECRET_KEY"] = secret_key or "local-development-only-change-before-deployment"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = is_render
+
+# TiDB Cloud settings take priority; DB_* variables remain supported for local MySQL.
+db_user = os.environ.get("TIDB_USER") or os.environ.get("DB_USER", "root")
+db_password = os.environ.get("TIDB_PASSWORD") or os.environ.get("DB_PASSWORD", "")
+db_host = os.environ.get("TIDB_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
+db_port = int(os.environ.get("TIDB_PORT") or ("4000" if os.environ.get("TIDB_HOST") else "3306"))
+db_name = os.environ.get("TIDB_DATABASE") or os.environ.get("DB_NAME", "sme_car_autoshop")
+ca_path = os.environ.get("TIDB_CA_PATH") or os.environ.get("CA_PATH")
+
+if not re.fullmatch(r"[A-Za-z0-9_]+", db_name):
+    raise RuntimeError("TIDB_DATABASE/DB_NAME may contain only letters, numbers, and underscores.")
+
+ssl_options = None
+if os.environ.get("TIDB_HOST"):
+    # Render's Linux image provides the system CA bundle. Locally, point TIDB_CA_PATH
+    # to the downloaded TiDB CA certificate (for example: certs/ca.pem).
+    ssl_options = {"check_hostname": True}
+    if ca_path:
+        ssl_options["ca"] = ca_path
+
+database_url = URL.create(
+    "mysql+pymysql",
+    username=db_user,
+    password=db_password,
+    host=db_host,
+    port=db_port,
+    database=db_name,
+    query={"charset": "utf8mb4"},
 )
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+engine_options = {
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
+    "pool_size": 5,
+    "max_overflow": 2,
+    "connect_args": {"connect_timeout": 15},
+}
+if ssl_options:
+    engine_options["connect_args"]["ssl"] = ssl_options
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
 db = SQLAlchemy(app)
 
 # ----------------------------- DATABASE MODELS -----------------------------
@@ -545,20 +589,47 @@ def server_error(_error):
     return render_template("error.html", code=500, message="An unexpected server error occurred. Check the terminal for details."), 500
 
 def initialize_database():
+    # Create the application schema before SQLAlchemy connects to it on first deploy.
+    if os.environ.get("TIDB_HOST"):
+        if not db_password:
+            raise RuntimeError("Set TIDB_PASSWORD in the hosting environment.")
+        connection = pymysql.connect(
+            host=db_host,
+            port=db_port,
+            user=db_user,
+            password=db_password,
+            database="sys",
+            charset="utf8mb4",
+            connect_timeout=15,
+            ssl=ssl_options,
+        )
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"CREATE DATABASE IF NOT EXISTS `{db_name}` "
+                    "CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
+                )
+        finally:
+            connection.close()
+
     with app.app_context():
         db.create_all()
-        admin = SystemUser.query.filter_by(username=os.environ.get("ADMIN_USERNAME", "admin")).first()
+        admin_username = os.environ.get("ADMIN_USERNAME", "admin")
+        admin = SystemUser.query.filter_by(username=admin_username).first()
         if not admin:
+            admin_password = os.environ.get("ADMIN_PASSWORD")
+            if is_render and (not admin_password or len(admin_password) < 12):
+                raise RuntimeError("Set ADMIN_PASSWORD to a strong password of at least 12 characters before first deployment.")
             admin = SystemUser(
                 full_name=os.environ.get("ADMIN_FULL_NAME", "System Administrator"),
-                username=os.environ.get("ADMIN_USERNAME", "admin"),
+                username=admin_username,
                 email=os.environ.get("ADMIN_EMAIL", "admin@autoshop.local"),
-                password_hash=generate_password_hash(os.environ.get("ADMIN_PASSWORD", "ChangeMe123!")),
+                password_hash=generate_password_hash(admin_password or "ChangeMe123!"),
                 role="Admin", status="Active"
             )
             db.session.add(admin)
             db.session.commit()
-            print("Default administrator created. Change the password after first login.")
+            print("Initial administrator account created. Change its password after first login.")
 if __name__ == "__main__":
     initialize_database()
     app.run(debug=os.environ.get("FLASK_DEBUG", "1") == "1", port=int(os.environ.get("PORT", "5000")))
