@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: sme-car-autoshop
+    runtime: python
+    plan: free
+    rootDir: sme_car_autoshop
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app
+    healthCheckPath: /login
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TIDB_HOST
+        value: gateway01.ap-southeast-1.prod.aws.tidbcloud.com
+      - key: TIDB_PORT
+        value: "4000"
+      - key: TIDB_USER
+        sync: false
+      - key: TIDB_PASSWORD
+        sync: false
+      - key: TIDB_DATABASE
+        value: sme_car_autoshop
+      - key: TIDB_CA_PATH
+        value: /etc/ssl/certs/ca-certificates.crt
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_FULL_NAME
+        value: SME Car Autoshop Administrator
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: FLASK_DEBUG
+        value: "0"
