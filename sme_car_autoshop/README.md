@@ -109,3 +109,25 @@ The password is stored as a Werkzeug password hash, not plain text.
 - Service selections on a job order are stored as job-order service links. The invoice's parts amount is entered by the staff member; this version tracks inventory quantities but does not automatically deduct parts when invoicing because individual part usage per job has not been specified.
 - This is a local learning/project baseline, not a security-audited production deployment. Before public deployment, configure a strong secret key, HTTPS, CSRF protection, backups, database least-privilege access, and proper operational logging.
 - Existing tables in your older `sme` database are not automatically migrated. This project uses the separate `sme_car_autoshop` database to avoid destructive schema changes.
+
+
+## TiDB Cloud + Render deployment
+
+This repository includes a Render Blueprint at the repository root. It deploys the
+Flask app from the `sme_car_autoshop/` directory (where the templates and static
+assets are located) using Gunicorn.
+
+1. Before deploying, reset the TiDB password if it was ever shown in a screenshot
+   or shared. Use the new password only in Render's environment variables.
+2. In Render, create a Blueprint from this repository and review the prompted
+   secret values. The Blueprint generates `SECRET_KEY`; enter the TiDB username,
+   new TiDB password, a unique administrator password (12+ characters), and
+   administrator email when prompted.
+3. The app creates the `sme_car_autoshop` database and its tables on first start.
+   TiDB Cloud public endpoints require TLS. The Render configuration uses the
+   Linux system CA bundle; locally set `TIDB_CA_PATH=certs/ca.pem` to your
+   downloaded certificate.
+4. Build command: `pip install -r requirements.txt`
+   Start command: `gunicorn wsgi:app`
+
+Never commit `.env`, passwords, or private credentials to GitHub.
